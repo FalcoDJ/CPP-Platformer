@@ -43,13 +43,13 @@ public: // Public Variables
     bool IsOnGround = false, IsOnCeiling = false, IsOnWallLeft = false, IsOnWallRight = false;
 };
 
-class ShapeSystem : public olc::PGEX
+class ShapeSystem
 {
 public: // Public Member Classes
     using sysRect = std::shared_ptr<Rectangle>;
 
 public: // Public Functions
-    ShapeSystem() : olc::PGEX(true) {}
+    ShapeSystem() {}
     ~ShapeSystem() {}
 
     static ShapeSystem &rGet()
@@ -92,6 +92,81 @@ public: // Public Functions
     void RemoveDynamicRectangle(sysRect &staticRect)
     {
         mStaticRectangles.erase(std::find(mStaticRectangles.begin(), mStaticRectangles.end(), staticRect));
+    }
+
+    void Update(const float &fElapsedTime)
+    {
+        std::vector<sysRect> kept_dynamic_rectangles_vec;
+        std::vector<sysRect> kept_static_rectangles_vec;
+
+        bool looped_through_static_rectangles_once = false;
+
+        for (auto &dynamic_rect1 : mDynamicRectangles)
+        {
+            if (dynamic_rect1 == nullptr)
+                continue;
+
+            kept_dynamic_rectangles_vec.push_back(dynamic_rect1);
+
+            dynamic_rect1->IsOnGround    = false;
+            dynamic_rect1->IsOnWallRight = false;
+            dynamic_rect1->IsOnWallLeft  = false;
+
+            olc::vf2d contact_point, contact_normal = {0.0f, 0.0f};
+            float contact_time = 0.0f;
+
+            // Work out collision point, add it to vector along with the static rectangle
+            for (auto &static_rectangle : mStaticRectangles)
+            {
+                if (static_rectangle == nullptr)
+                    continue;
+
+                if (!looped_through_static_rectangles_once)
+                    kept_static_rectangles_vec.push_back(static_rectangle);
+
+                if (static_rectangle->Layer == dynamic_rect1->Layer)
+                    continue;
+
+                if (TestRectangleVsRectangle(GetBroadPhaseBox(dynamic_rect1.get(), fElapsedTime), static_rectangle.get()))
+                if (TestDynamicRectVsRect(dynamic_rect1.get(), static_rectangle.get(), contact_point, contact_normal, contact_time, fElapsedTime))
+                {
+                    dynamic_rect1->IsOnGround    = (contact_normal.y < 0.0f) || dynamic_rect1->IsOnGround;
+                    dynamic_rect1->IsOnWallRight = (contact_normal.x < 0.0f) || dynamic_rect1->IsOnWallRight;
+                    dynamic_rect1->IsOnWallLeft  = (contact_normal.x > 0.0f) || dynamic_rect1->IsOnWallLeft;
+
+                    bool resolve_collision = true;
+
+                    if (static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::ALL)
+                    {
+                        if (contact_normal.y > 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::DOWN) // Dynamic collided with top of static
+                            resolve_collision = false, dynamic_rect1->IsOnGround = false;
+                        else
+                        if (contact_normal.y < 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::UP) // Dynamic collided with bottom of static
+                            resolve_collision = false, dynamic_rect1->IsOnCeiling = false;
+                        else
+                        if (contact_normal.x > 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::RIGHT) // Dynamic collided with left of static
+                            resolve_collision = false, dynamic_rect1->IsOnWallRight = false;
+                        else
+                        if (contact_normal.x < 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::LEFT) // Dynamic collided with right of static
+                            resolve_collision = false, dynamic_rect1->IsOnWallLeft = false;
+                        
+                    }
+
+                    if (resolve_collision)
+                        dynamic_rect1->Velocity += contact_normal * olc::vf2d(std::abs(dynamic_rect1->Velocity.x),std::abs(dynamic_rect1->Velocity.y)) * (1 - contact_time);
+                }
+            }
+
+            dynamic_rect1->GlobalPosition += dynamic_rect1->Velocity * fElapsedTime;
+
+            looped_through_static_rectangles_once = true;
+        }
+
+        // Keep valid rectangles
+        mDynamicRectangles.clear();
+        mDynamicRectangles.swap(kept_dynamic_rectangles_vec);
+        mStaticRectangles.clear();
+        mStaticRectangles.swap(kept_static_rectangles_vec);
     }
     
     void Draw(Camera2d &cam2d)
@@ -221,81 +296,6 @@ private: // Private Functions
             return (contactTime >= 0.0f && contactTime < 1.0f);
         else
             return false;
-    }
-
-    void OnBeforeUserUpdate(float &fElapsedTime) override
-    {
-        std::vector<sysRect> kept_dynamic_rectangles_vec;
-        std::vector<sysRect> kept_static_rectangles_vec;
-
-        bool looped_through_static_rectangles_once = false;
-
-        for (auto &dynamic_rect1 : mDynamicRectangles)
-        {
-            if (dynamic_rect1 == nullptr)
-                continue;
-
-            kept_dynamic_rectangles_vec.push_back(dynamic_rect1);
-
-            dynamic_rect1->IsOnGround    = false;
-            dynamic_rect1->IsOnWallRight = false;
-            dynamic_rect1->IsOnWallLeft  = false;
-
-            olc::vf2d contact_point, contact_normal = {0.0f, 0.0f};
-            float contact_time = 0.0f;
-
-            // Work out collision point, add it to vector along with the static rectangle
-            for (auto &static_rectangle : mStaticRectangles)
-            {
-                if (static_rectangle == nullptr)
-                    continue;
-
-                if (!looped_through_static_rectangles_once)
-                    kept_static_rectangles_vec.push_back(static_rectangle);
-
-                if (static_rectangle->Layer == dynamic_rect1->Layer)
-                    continue;
-
-                if (TestRectangleVsRectangle(GetBroadPhaseBox(dynamic_rect1.get(), fElapsedTime), static_rectangle.get()))
-                if (TestDynamicRectVsRect(dynamic_rect1.get(), static_rectangle.get(), contact_point, contact_normal, contact_time, fElapsedTime))
-                {
-                    dynamic_rect1->IsOnGround    = (contact_normal.y < 0.0f) || dynamic_rect1->IsOnGround;
-                    dynamic_rect1->IsOnWallRight = (contact_normal.x < 0.0f) || dynamic_rect1->IsOnWallRight;
-                    dynamic_rect1->IsOnWallLeft  = (contact_normal.x > 0.0f) || dynamic_rect1->IsOnWallLeft;
-
-                    bool resolve_collision = true;
-
-                    if (static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::ALL)
-                    {
-                        if (contact_normal.y > 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::DOWN) // Dynamic collided with top of static
-                            resolve_collision = false, dynamic_rect1->IsOnGround = false;
-                        else
-                        if (contact_normal.y < 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::UP) // Dynamic collided with bottom of static
-                            resolve_collision = false, dynamic_rect1->IsOnCeiling = false;
-                        else
-                        if (contact_normal.x > 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::RIGHT) // Dynamic collided with left of static
-                            resolve_collision = false, dynamic_rect1->IsOnWallRight = false;
-                        else
-                        if (contact_normal.x < 0 && static_rectangle->CollisionDirectionMode != Rectangle::CollisionDirection::LEFT) // Dynamic collided with right of static
-                            resolve_collision = false, dynamic_rect1->IsOnWallLeft = false;
-                        
-                    }
-
-                    if (resolve_collision)
-                        dynamic_rect1->Velocity += contact_normal * olc::vf2d(std::abs(dynamic_rect1->Velocity.x),std::abs(dynamic_rect1->Velocity.y)) * (1 - contact_time);
-                }
-            }
-
-            dynamic_rect1->GlobalPosition += dynamic_rect1->Velocity * fElapsedTime;
-
-            looped_through_static_rectangles_once = true;
-        }
-
-        // Keep valid rectangles
-        mDynamicRectangles.clear();
-        mDynamicRectangles.swap(kept_dynamic_rectangles_vec);
-        mStaticRectangles.clear();
-        mStaticRectangles.swap(kept_static_rectangles_vec);
     }
 
 private: // Private Variables

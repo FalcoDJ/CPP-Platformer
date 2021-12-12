@@ -3,8 +3,6 @@
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
 
-#define DEBUG_FILE_SYSTEM
-
 #include <Extensions/olcPGEX_InputMap.h>
 #include <FileChecker.hpp>
 #include <Extensions/olcPGEX_ResourceManager.h>
@@ -105,6 +103,7 @@ public:
     void Update(float delta)
     {
         GetInput(delta);
+        m_ActualAnimationFlipH = Math::lerp(m_ActualAnimationFlipH, m_AnimationFlipH, 1 - std::pow(0.0005f, delta));
 
         m_StateMachine.Update(delta);
 
@@ -116,6 +115,7 @@ public:
         m_ShouldFall = m_Bounds->Velocity.y > 0 && !m_Bounds->IsOnGround;
         if (m_ShouldFall)
             m_IsJumping = false, m_ShouldJump = false;
+        
         m_ShouldRun = m_InputX != 0 && m_Bounds->IsOnGround;
         m_ShouldIdle = m_InputX == 0 && m_Bounds->IsOnGround;
 
@@ -126,7 +126,7 @@ public:
 
     void Draw(Camera2d &cam2d)
     {
-        m_Animator.DrawAnimationFrame(cam2d.rGetRenderer().WorldToScreen(m_Bounds->GlobalPosition + m_Origin), 0.0f, cam2d.rGetRenderer().GetWorldScale() * olc::vf2d(m_AnimationFlipH, 1.0f));
+        m_Animator.DrawAnimationFrame(cam2d.rGetRenderer().WorldToScreen(m_Bounds->GlobalPosition + m_Origin), 0.0f, cam2d.rGetRenderer().GetWorldScale() * olc::vf2d(m_ActualAnimationFlipH, 1.0f));
     }
 
     friend class p_StateMachine;
@@ -135,8 +135,8 @@ protected:
     void GetInput(float delta)
     {
         m_InputX = (float)m_RightKey.IsHeld - (float)m_LeftKey.IsHeld;
-        int in_x_sign = Math::SIGN(m_InputX);
-        m_AnimationFlipH = in_x_sign != 0 ? in_x_sign : m_AnimationFlipH;
+        m_AnimationFlipH = m_InputX != 0 ? m_InputX : m_AnimationFlipH;
+        std::cout << m_AnimationFlipH << "\n";
 
         if (m_JumpKey.IsPressed && (m_Bounds->IsOnGround || m_CoyoteTimer.IsRunning()) && !m_IsJumping)
         {
@@ -180,6 +180,7 @@ private:
     std::string m_TurnAnimation = "turn";
     olcPGEX_Animator2D m_Animator;
     float m_AnimationFlipH = 1;
+    float m_ActualAnimationFlipH = 1;
     olc::vf2d m_Origin = {8, 24};
 
     p_StateMachine m_StateMachine;
@@ -243,9 +244,11 @@ void p_StateMachine::Logic(float delta)
 
 int p_StateMachine::GetTransition(float delta)
 {
+    if (State == NullState) return IdleState.Id;
+
     if (State == IdleState)
     {
-        if (Parent->p_ShouldRun() && State != RunState)
+        if (Parent->p_ShouldRun())
             return RunState.Id;
     }
 
@@ -262,8 +265,8 @@ int p_StateMachine::GetTransition(float delta)
 
     if (State == FallState)
     {
-        if (Parent->p_ShouldRun() && State != RunState)
-            State = RunState.Id;
+        if (Parent->p_ShouldRun())
+            return RunState.Id;
     }
 
     if (Parent->p_ShouldJump() && State != JumpState)
@@ -276,7 +279,7 @@ int p_StateMachine::GetTransition(float delta)
 
     if (Parent->p_ShouldIdle() && !Parent->p_ShouldTurn())
         return IdleState.Id;
-    else if (Parent->p_ShouldTurn())
+    else if (Parent->p_ShouldTurn() && State != JumpState && State != FallState)
         return TurnState.Id;
 
     return State;
@@ -290,13 +293,13 @@ void p_StateMachine::EnterState(int newState, int oldState)
         Parent->m_Animator.Play(Parent->m_RunAnimation);
     
     if (newState == TurnState)
-        Parent->m_Animator.Play(Parent->m_TurnAnimation);
+        Parent->m_Animator.Play(Parent->m_RunAnimation);
 
     if (newState == IdleState)
         Parent->m_Animator.Play(Parent->m_IdleAnimation);
     
     if (newState == JumpState)
-        Parent->m_Animator.Play(Parent->m_RunAnimation);
+        Parent->m_Animator.Play(Parent->m_JumpAnimation);
     
     if (newState == FallState && oldState == JumpState)
         Parent->m_Animator.Play(Parent->m_FallAnimation);

@@ -22,7 +22,7 @@ public: // Public Functions
     olc::PixelGameEngine *pGetPixelGameEngine() { return pge; }
 
     void SetCameraSize(olc::vi2d cameraSize) { mCameraSize = cameraSize; mRenderer.Initialise(mCameraSize); }
-    void SetCameraOffset(olc::vf2d offset) { mCameraOffset = offset; std::cout << offset << std::endl; }
+    void SetCameraOffset(olc::vf2d offset) { mCameraOffset = offset; }
     void SetCameraEasing(bool enabled, float easing = 0.0f) 
     { 
         mLinearlyInterpolateCamera = enabled;

@@ -2,7 +2,8 @@
 #ifndef TIMER_HPP
 #define TIMER_HPP
 
-#include "olcPixelGameEngine.h"
+#include <olcPixelGameEngine.h>
+#include <DeltaSpeedModifier.hpp>
 
 class Timer : public olc::PGEX
 {
@@ -40,7 +41,7 @@ private: // Private Functions
     void OnBeforeUserUpdate(float &fElapsedTime) override
     {
         mWasRunning = IsRunning();
-        if (IsRunning()) mElapsedTime += fElapsedTime;
+        if (IsRunning()) mElapsedTime += DeltaSpeedModifier::GetDelta();
     }
 
 private: // Private Variables

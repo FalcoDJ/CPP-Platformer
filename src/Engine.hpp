@@ -20,6 +20,7 @@
 #include <HitBoxSystem/HitBoxSystem.hpp>
 #include <Shapes/ShapeSystem.hpp>
 #include <DebugController.hpp>
+#include <DeltaSpeedModifier.hpp>
 
 #include "Entities/Player/Player.hpp"
 
@@ -41,7 +42,7 @@ public:
     olc::vf2d WindowSize = {1024, 576}, CanvasSize = {320, 180};
     float PixelScale = 1;
 
-private:
+private: 
     bool OnUserCreate() override
     {
         m_Cam2d.SetCameraSize(CanvasSize);
@@ -49,6 +50,8 @@ private:
         m_Cam2d.SetCameraEasing(true, 0.2f);
 
         if (!p.Init()) return false;
+
+        DeltaSpeedModifier::SetSpeed(1.0f);
 
         return true;
     }
@@ -58,7 +61,10 @@ private:
         olc::LayerController::SafelyClearDebuglayer(olc::BLANK);
         Clear(olc::BLANK);
 
-        p.Update(delta);
+        p.Update(DeltaSpeedModifier::GetDelta());
+
+        ShapeSystem::rGet().Update(DeltaSpeedModifier::GetDelta());
+        HitBoxSystem::rGet().Update(DeltaSpeedModifier::GetDelta());
 
         m_Cam2d.SetCameraPosition(p.GetGlobalPosition());
 

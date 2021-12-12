@@ -107,14 +107,14 @@ class HurtBox : public HitBox
         olc::vf2d OverlapDirection = {0.0f, 0.0f};
 };
 
-class HitBoxSystem : olc::PGEX
+class HitBoxSystem
 {
 public: // Public Member Classes
     using sysHitBox  = std::shared_ptr<HitBox>;
     using sysHurtBox = std::shared_ptr<HurtBox>;
 
 public: // Public Functions
-    HitBoxSystem() : olc::PGEX(true) {}
+    HitBoxSystem() {}
     ~HitBoxSystem() {}
 
     static HitBoxSystem &rGet()
@@ -181,7 +181,7 @@ public: // Public Functions
         }
     }
 
-    void OnBeforeUserUpdate(float &fElapsedTime) override
+    void Update(const float &fElapsedTime)
     {
         std::vector<sysHitBox>  kept_hit_boxes;
         std::vector<sysHurtBox> kept_hurt_boxes;
