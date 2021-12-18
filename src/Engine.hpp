@@ -34,6 +34,8 @@
 #include <Camera.hpp>
 #include <Extensions/olcPGEX_Slider.h>
 #include <DebugController.hpp>
+#include <AudioController.hpp>
+
 
 #include "Entities/Player/Player.hpp"
 
@@ -47,7 +49,7 @@ public:
 
         PixelScale = std::max(WindowSize.x / CanvasSize.x, WindowSize.y / CanvasSize.y);
         ShapeSystem::rGet().AddStaticRectangle(floor);
-        floor->Size = {CanvasSize.x * 0.75f, 8.0f};
+        floor->Size = {CanvasSize.x, 8.0f};
         floor->GlobalPosition = {0.0f, 150.0f};
         floor->Layer = ShapeSystem::rGet().GetLayer("world");
     }
@@ -69,6 +71,11 @@ private:
 
         DebugController::rGet().SetDebugging(true);
 
+        AudioController::rGet()->AudioSystemInit();
+
+        flip.AL = AudioController::rGet();
+        flip.LoadAudioSample(AudioController::rGet()->audioSamples.size(), "assets/Audio/flip.wav");
+
         return true;
     }
 
@@ -78,10 +85,12 @@ private:
         Clear(olc::BLANK);
 
         DeltaSpeedModifier::SetSpeed(sl.GetValue());
+
         if (GetKey(olc::P).bPressed)
         {
             DebugController::rGet().SetDebugging(!db_key.IsDebuggerEnabled());
             sl.Activate(db_key.IsDebuggerEnabled());
+            flip.Play(DeltaSpeedModifier::GetSpeed());
         }
 
         p.Update(DeltaSpeedModifier::GetDelta());
@@ -104,13 +113,14 @@ private:
     }
 
 private:
+    DebugEnitity db_key;
     Camera2d m_Cam2d;
 
     Player p;
     ShapeSystem::sysRect floor = std::make_shared<Rectangle>();
     Slider sl;
 
-    DebugEnitity db_key;
+    olcPGEX_AudioSource flip;
 };
 
 #endif

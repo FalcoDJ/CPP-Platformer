@@ -26,6 +26,7 @@ class DeltaSpeedModifier : public olc::PGEX
 {    
 public:
     static float GetDelta() { return pge->GetElapsedTime() * rGet().m_SpeedModifier; }
+    static float GetSpeed() { return rGet().m_SpeedModifier; }
 
     // Speed Modifier must always be greater than zero
     static void SetSpeed(float speedModifier) { assert(speedModifier > 0); rGet().m_SpeedModifier = speedModifier; }

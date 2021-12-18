@@ -167,8 +167,8 @@
 #ifndef OLC_PGEX_AUDIO_LISTENER
 #define OLC_PGEX_AUDIO_LISTENER
 
-#include <soloud.h>
-#include <soloud_wav.h>
+#include <soloud/include/soloud.h>
+#include <soloud/include/soloud_wav.h>
 #include <olcPixelGameEngine.h>
 
 class olcPGEX_AudioListener : public olc::PGEX

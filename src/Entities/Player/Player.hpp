@@ -13,6 +13,8 @@
 #include <Shapes/ShapeSystem.hpp>
 #include <HitBoxSystem/HitBoxSystem.hpp>
 #include <Camera.hpp>
+#include <Extensions/olcPGEX_AudioSource.h>
+#include <AudioController.hpp>
 
 class Player;
 
@@ -31,7 +33,7 @@ public:
     void Logic(float delta) override;
     int GetTransition(float delta) override;
     void EnterState(int newState, int oldState) override;
-    void ExitState(int oldState, int newState) override{};
+    void ExitState(int oldState, int newState) override;
 
 private:
     StateMachineKey IdleState, JumpState, FallState, RunState, TurnState;
@@ -64,36 +66,31 @@ public:
 
     bool Init()
     {
-        if (file::doesExist("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Idle (32x32).png"))
-            m_IdleDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Idle (32x32).png"));
-        else
-            return false;
-
-        if (file::doesExist("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Run (32x32).png"))
-            m_RunDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Run (32x32).png"));
-        else
-            return false;
-
-        if (file::doesExist("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Jump (32x32).png"))
-            m_JumpDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Jump (32x32).png"));
-        else
-            return false;
-
-        if (file::doesExist("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Fall (32x32).png"))
-            m_FallDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Fall (32x32).png"));
-        else
-            return false;
+        if (!file::batchDoesExist({"assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Idle (32x32).png",
+                                   "assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Run (32x32).png",
+                                   "assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Jump (32x32).png",
+                                   "assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Fall (32x32).png",
+                                   "assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Double Jump (32x32).png",
+                                   "assets/Audio/footstepsfast.mp3",
+                                   "assets/Audio/jump.wav"}))
+        return false;
         
-        if (file::doesExist("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Double Jump (32x32).png"))
-            m_TurnDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Double Jump (32x32).png"));
-        else
-            return false;
-
+        m_IdleDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Idle (32x32).png"));
+        m_RunDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Run (32x32).png"));
+        m_JumpDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Jump (32x32).png"));
+        m_FallDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Fall (32x32).png"));
+        m_TurnDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Double Jump (32x32).png"));
+            
         m_Animator.AddAnimation(m_IdleAnimation, 0.825f, 11, m_IdleDecal, {0, 0}, {32, 32}, {16, 32});
         m_Animator.AddAnimation(m_RunAnimation,    0.9f, 12, m_RunDecal,  {0, 0}, {32, 32}, {16, 32});
         m_Animator.AddAnimation(m_TurnAnimation, 0.240f,  6, m_TurnDecal, {0, 0}, {32, 32}, {16, 32});
         m_Animator.AddAnimation(m_JumpAnimation, 0.825f,  1, m_JumpDecal, {0, 0}, {32, 32}, {16, 32});
         m_Animator.AddAnimation(m_FallAnimation, 0.825f,  1, m_FallDecal, {0, 0}, {32, 32}, {16, 32});
+            
+        m_SFX_Jump.AL = AudioController::rGet();
+        m_SFX_Jump.LoadAudioSample(AudioController::rGet()->audioSamples.size(),"assets/Audio/jump.wav");
+        m_SFX_Run.AL = AudioController::rGet();
+        m_SFX_Run.LoadAudioSample(AudioController::rGet()->audioSamples.size(), "assets/Audio/footstepsfast.mp3");
 
         return true;
     }
@@ -182,6 +179,9 @@ private:
     float m_ActualAnimationFlipH = 1;
     olc::vf2d m_Origin = {8, 24};
 
+    olcPGEX_AudioSource m_SFX_Jump;
+    olcPGEX_AudioSource m_SFX_Run;
+
     p_StateMachine m_StateMachine;
     olc::InputMap m_JumpKey, m_LeftKey, m_RightKey;
     ShapeSystem::sysRect m_Bounds = std::make_shared<Rectangle>();
@@ -241,6 +241,15 @@ void p_StateMachine::Logic(float delta)
     Parent->ApplyInputXToVelocity(delta);
 }
 
+void p_StateMachine::ExitState(int oldState, int newState)
+{
+    if (oldState == RunState)
+    {
+        Parent->m_SFX_Run.Stop();
+    }
+}
+
+
 int p_StateMachine::GetTransition(float delta)
 {
     if (State == NullState) return IdleState.Id;
@@ -268,8 +277,8 @@ int p_StateMachine::GetTransition(float delta)
             return RunState.Id;
     }
 
-    if (Parent->p_ShouldJump() && State != JumpState)
-        return JumpState.Id;
+    if (Parent->p_ShouldJump() && PreviousState != JumpState)
+            return JumpState.Id;
     else if (State == JumpState)
     {
         if (Parent->p_ShouldFall())
@@ -289,7 +298,10 @@ void p_StateMachine::EnterState(int newState, int oldState)
     Parent->m_Animator.StopAll();
 
     if (newState == RunState)
+    {
+        Parent->m_SFX_Run.Play(DeltaSpeedModifier::GetSpeed() * 1.4f, 1.8f, true);
         Parent->m_Animator.Play(Parent->m_RunAnimation);
+    }
     
     if (newState == TurnState)
         Parent->m_Animator.Play(Parent->m_RunAnimation);
@@ -298,7 +310,10 @@ void p_StateMachine::EnterState(int newState, int oldState)
         Parent->m_Animator.Play(Parent->m_IdleAnimation);
     
     if (newState == JumpState)
+    {
+        Parent->m_SFX_Jump.Play(DeltaSpeedModifier::GetSpeed());
         Parent->m_Animator.Play(Parent->m_JumpAnimation);
+    }
     
     if (newState == FallState && oldState == JumpState)
         Parent->m_Animator.Play(Parent->m_FallAnimation);
