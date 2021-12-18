@@ -15,12 +15,25 @@
 #define OLC_PGEX_RESOURCE_MANAGER
 #endif
 
+#ifndef AUDIO_LISTENER_IMPLEMENTATION
+#define AUDIO_LISTENER_IMPLEMENTATION
+#endif
+
+#ifndef AUDIO_SOURCE_IMPLEMENTATION
+#define AUDIO_SOURCE_IMPLEMENTATION
+#endif
+
+#include <Extensions/olcPGEX_AudioSource.h>
+#include <Extensions/olcPGEX_AudioListener.h>
+
 #include <olcPixelGameEngine.h>
-#include <Camera.hpp>
-#include <HitBoxSystem/HitBoxSystem.hpp>
+#include <Extensions/olcPGEX_DeltaSpeedModifier.h>
 #include <Shapes/ShapeSystem.hpp>
+#include <HitBoxSystem/HitBoxSystem.hpp>
 #include <DebugController.hpp>
-#include <DeltaSpeedModifier.hpp>
+#include <Camera.hpp>
+#include <Extensions/olcPGEX_Slider.h>
+#include <DebugController.hpp>
 
 #include "Entities/Player/Player.hpp"
 
@@ -51,7 +64,10 @@ private:
 
         if (!p.Init()) return false;
 
-        DeltaSpeedModifier::SetSpeed(1.0f);
+        sl.SetSliderLength(100.0f);
+        sl.SetRange(0.5f, 3.5f, 1.0f);
+
+        DebugController::rGet().SetDebugging(true);
 
         return true;
     }
@@ -61,6 +77,13 @@ private:
         olc::LayerController::SafelyClearDebuglayer(olc::BLANK);
         Clear(olc::BLANK);
 
+        DeltaSpeedModifier::SetSpeed(sl.GetValue());
+        if (GetKey(olc::P).bPressed)
+        {
+            DebugController::rGet().SetDebugging(!db_key.IsDebuggerEnabled());
+            sl.Activate(db_key.IsDebuggerEnabled());
+        }
+
         p.Update(DeltaSpeedModifier::GetDelta());
 
         ShapeSystem::rGet().Update(DeltaSpeedModifier::GetDelta());
@@ -68,10 +91,14 @@ private:
 
         m_Cam2d.SetCameraPosition(p.GetGlobalPosition());
 
+        sl.Draw();
         p.Draw(m_Cam2d);
 
-        ShapeSystem::rGet().Draw(m_Cam2d);
-        HitBoxSystem::rGet().Draw(m_Cam2d);
+        if (db_key.IsDebuggerEnabled())
+        {
+            ShapeSystem::rGet().Draw(m_Cam2d);
+            HitBoxSystem::rGet().Draw(m_Cam2d);
+        }
 
         return true;
     }
@@ -81,6 +108,9 @@ private:
 
     Player p;
     ShapeSystem::sysRect floor = std::make_shared<Rectangle>();
+    Slider sl;
+
+    DebugEnitity db_key;
 };
 
 #endif

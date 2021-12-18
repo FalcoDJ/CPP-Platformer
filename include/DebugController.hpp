@@ -37,7 +37,12 @@ public:
     DebugEnitity() { DebugController::rGet().RegisterInputMap(this); }
     ~DebugEnitity() {}
 
+    bool IsDebuggerEnabled() { return DebugEnabled; }
+
+private:
     bool DebugEnabled = false;
+
+    friend class DebugController;
 };
 
 void DebugController::SetDebugging(bool enabled)

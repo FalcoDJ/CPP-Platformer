@@ -2,7 +2,7 @@
 
 #pragma region readme_region
 /*
-    olcPGEX_InputMap.h
+    olcPGEX_ResourceManager.h
 
     +-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |

@@ -4,6 +4,7 @@
 #define PLAYER_HPP
 
 #include <Extensions/olcPGEX_InputMap.h>
+#include <Extensions/olcPGEX_Timer.hpp>
 #include <FileChecker.hpp>
 #include <Extensions/olcPGEX_ResourceManager.h>
 #include <Extensions/olcPGEX_Animator2D.h>
@@ -12,7 +13,6 @@
 #include <Shapes/ShapeSystem.hpp>
 #include <HitBoxSystem/HitBoxSystem.hpp>
 #include <Camera.hpp>
-#include <Timer.hpp>
 
 class Player;
 
@@ -136,7 +136,6 @@ protected:
     {
         m_InputX = (float)m_RightKey.IsHeld - (float)m_LeftKey.IsHeld;
         m_AnimationFlipH = m_InputX != 0 ? m_InputX : m_AnimationFlipH;
-        std::cout << m_AnimationFlipH << "\n";
 
         if (m_JumpKey.IsPressed && (m_Bounds->IsOnGround || m_CoyoteTimer.IsRunning()) && !m_IsJumping)
         {
