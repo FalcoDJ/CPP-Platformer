@@ -23,8 +23,13 @@
 #define AUDIO_SOURCE_IMPLEMENTATION
 #endif
 
+#ifndef OLC_PGE_GAMEPAD
+#define OLC_PGE_GAMEPAD
+#endif
+
 #include <Extensions/olcPGEX_AudioSource.h>
 #include <Extensions/olcPGEX_AudioListener.h>
+#include <Extensions/olcPGEX_Gamepad.h>
 
 #include <olcPixelGameEngine.h>
 #include <Extensions/olcPGEX_DeltaSpeedModifier.h>
@@ -35,7 +40,6 @@
 #include <Extensions/olcPGEX_Slider.h>
 #include <DebugController.hpp>
 #include <AudioController.hpp>
-
 
 #include "Entities/Player/Player.hpp"
 
@@ -76,6 +80,10 @@ private:
         flip.AL = AudioController::rGet();
         flip.LoadAudioSample(AudioController::rGet()->audioSamples.size(), "assets/Audio/flip.wav");
 
+        olc::GamePad::init();
+
+        DeltaSpeedModifier::SetSpeed(0.0f);
+
         return true;
     }
 
@@ -83,8 +91,6 @@ private:
     {
         olc::LayerController::SafelyClearDebuglayer(olc::BLANK);
         Clear(olc::BLANK);
-
-        DeltaSpeedModifier::SetSpeed(sl.GetValue());
 
         if (GetKey(olc::P).bPressed)
         {
@@ -97,6 +103,8 @@ private:
 
         ShapeSystem::rGet().Update(DeltaSpeedModifier::GetDelta());
         HitBoxSystem::rGet().Update(DeltaSpeedModifier::GetDelta());
+
+        DeltaSpeedModifier::SetSpeed(sl.GetValue());
 
         m_Cam2d.SetCameraPosition(p.GetGlobalPosition());
 

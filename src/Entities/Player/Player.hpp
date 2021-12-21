@@ -4,6 +4,7 @@
 #define PLAYER_HPP
 
 #include <Extensions/olcPGEX_InputMap.h>
+#include <Extensions/olcPGEX_Gamepad.h>
 #include <Extensions/olcPGEX_Timer.hpp>
 #include <FileChecker.hpp>
 #include <Extensions/olcPGEX_ResourceManager.h>
@@ -73,22 +74,22 @@ public:
                                    "assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Double Jump (32x32).png",
                                    "assets/Audio/footstepsfast.mp3",
                                    "assets/Audio/jump.wav"}))
-        return false;
-        
+            return false;
+
         m_IdleDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Idle (32x32).png"));
         m_RunDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Run (32x32).png"));
         m_JumpDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Jump (32x32).png"));
         m_FallDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Fall (32x32).png"));
         m_TurnDecal = new olc::Decal(olc::ResourceManager::GetSprite("assets/Pixel Adventure 1/Free/Main Characters/Virtual Guy/Double Jump (32x32).png"));
-            
+
         m_Animator.AddAnimation(m_IdleAnimation, 0.825f, 11, m_IdleDecal, {0, 0}, {32, 32}, {16, 32});
-        m_Animator.AddAnimation(m_RunAnimation,    0.9f, 12, m_RunDecal,  {0, 0}, {32, 32}, {16, 32});
-        m_Animator.AddAnimation(m_TurnAnimation, 0.240f,  6, m_TurnDecal, {0, 0}, {32, 32}, {16, 32});
-        m_Animator.AddAnimation(m_JumpAnimation, 0.825f,  1, m_JumpDecal, {0, 0}, {32, 32}, {16, 32});
-        m_Animator.AddAnimation(m_FallAnimation, 0.825f,  1, m_FallDecal, {0, 0}, {32, 32}, {16, 32});
-            
+        m_Animator.AddAnimation(m_RunAnimation, 0.9f, 12, m_RunDecal, {0, 0}, {32, 32}, {16, 32});
+        m_Animator.AddAnimation(m_TurnAnimation, 0.240f, 6, m_TurnDecal, {0, 0}, {32, 32}, {16, 32});
+        m_Animator.AddAnimation(m_JumpAnimation, 0.825f, 1, m_JumpDecal, {0, 0}, {32, 32}, {16, 32});
+        m_Animator.AddAnimation(m_FallAnimation, 0.825f, 1, m_FallDecal, {0, 0}, {32, 32}, {16, 32});
+
         m_SFX_Jump.AL = AudioController::rGet();
-        m_SFX_Jump.LoadAudioSample(AudioController::rGet()->audioSamples.size(),"assets/Audio/jump.wav");
+        m_SFX_Jump.LoadAudioSample(AudioController::rGet()->audioSamples.size(), "assets/Audio/jump.wav");
         m_SFX_Run.AL = AudioController::rGet();
         m_SFX_Run.LoadAudioSample(AudioController::rGet()->audioSamples.size(), "assets/Audio/footstepsfast.mp3");
 
@@ -100,6 +101,7 @@ public:
     void Update(float delta)
     {
         GetInput(delta);
+
         m_ActualAnimationFlipH = Math::lerp(m_ActualAnimationFlipH, m_AnimationFlipH, 1 - std::pow(0.0005f, delta));
 
         m_StateMachine.Update(delta);
@@ -112,7 +114,7 @@ public:
         m_ShouldFall = m_Bounds->Velocity.y > 0 && !m_Bounds->IsOnGround;
         if (m_ShouldFall)
             m_IsJumping = false, m_ShouldJump = false;
-        
+
         m_ShouldRun = m_InputX != 0 && m_Bounds->IsOnGround;
         m_ShouldIdle = m_InputX == 0 && m_Bounds->IsOnGround;
 
@@ -129,24 +131,72 @@ public:
     friend class p_StateMachine;
 
 protected:
+    bool FindGamepad()
+    {
+        if (m_GamePad != nullptr)
+        {
+            if (m_GamePad_Search_Timer.JustFinished())
+            {
+                m_GamePad->enumerateGamepads();
+
+                if (m_GamePad->stillConnected)
+                {
+                    m_JustFoundGamePad = true;
+                    return true;
+                }
+            }
+            if (!m_GamePad_Search_Timer.IsRunning())
+                m_GamePad_Search_Timer.Start(5.0f);
+        }
+        else
+        {
+            m_GamePad = olc::GamePad::selectWithButton(olc::GPButtons::FACE_R);
+        }
+
+        return false;
+    }
+    bool CheckGamepad()
+    {
+        if (m_GamePad == nullptr)
+            return false;
+
+        if (!m_GamePad->stillConnected)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+protected:
     void GetInput(float delta)
     {
-        m_InputX = (float)m_RightKey.IsHeld - (float)m_LeftKey.IsHeld;
-        m_AnimationFlipH = m_InputX != 0 ? m_InputX : m_AnimationFlipH;
+        if (!CheckGamepad())
+        {
+            m_InputX = (float)m_RightKey.IsHeld - (float)m_LeftKey.IsHeld;
 
-        if (m_JumpKey.IsPressed && (m_Bounds->IsOnGround || m_CoyoteTimer.IsRunning()) && !m_IsJumping)
-        {
-            m_Bounds->Velocity.y = m_MaxJumpSpeed;
-            m_ShouldJump = true;
-            m_IsJumping = true;
-            m_CoyoteTimer.Stop();
+            if (m_JumpKey.IsPressed && (m_Bounds->IsOnGround || m_CoyoteTimer.IsRunning()) && !m_IsJumping)
+            {
+                m_ShouldJump = true;
+            }
+
+            if (m_LookForGamepads)
+                if (FindGamepad()) // Note: FindGamePad() returns true after re-finding the gamepad
+                {
+                    return;
+                }
         }
-        if (m_JumpKey.IsReleased && m_IsJumping && m_Bounds->Velocity.y < m_MaxJumpSpeed * 0.8f)
+        else if (!m_JustFoundGamePad)
         {
-            m_Bounds->Velocity.y = m_MinJumpSpeed;
-            m_ShouldJump = false;
-            m_IsJumping = false;
+            m_InputX = (float)m_GamePad->getButton(olc::GPButtons::DPAD_R).bHeld - (float)m_GamePad->getButton(olc::GPButtons::DPAD_L).bHeld;
+
+            if (m_GamePad->getButton(olc::GPButtons::FACE_D).bPressed && (m_Bounds->IsOnGround || m_CoyoteTimer.IsRunning()) && !m_IsJumping)
+            {
+                m_ShouldJump = true;
+            }
         }
+        m_JustFoundGamePad = false;
+        m_AnimationFlipH = m_InputX != 0 ? m_InputX : m_AnimationFlipH;
     }
     void ApplyGravityToVelocity(float delta)
     {
@@ -155,6 +205,21 @@ protected:
     void ApplyInputXToVelocity(float delta)
     {
         m_Bounds->Velocity.x = Math::move_toward(m_Bounds->Velocity.x, m_InputX * m_Speed, ACC_and_FRC * delta);
+    }
+    void Jump()
+    {
+        m_Bounds->Velocity.y = m_MaxJumpSpeed;
+        m_IsJumping = true;
+        m_CoyoteTimer.Stop();
+    }
+    void CheckForJumpReleased()
+    {
+        if (m_JumpKey.IsReleased && m_IsJumping && m_Bounds->Velocity.y < m_MaxJumpSpeed * 0.8f)
+        {
+            m_Bounds->Velocity.y = m_MinJumpSpeed;
+            m_ShouldJump = false;
+            m_IsJumping = false;
+        }
     }
 
     bool p_ShouldIdle() { return m_ShouldIdle; }
@@ -183,7 +248,14 @@ private:
     olcPGEX_AudioSource m_SFX_Run;
 
     p_StateMachine m_StateMachine;
+
     olc::InputMap m_JumpKey, m_LeftKey, m_RightKey;
+
+    bool m_LookForGamepads = true;
+    olc::GamePad *m_GamePad = nullptr;
+    Timer m_GamePad_Search_Timer;
+    bool m_JustFoundGamePad = false;
+
     ShapeSystem::sysRect m_Bounds = std::make_shared<Rectangle>();
     HitBoxSystem::sysHurtBox m_HurtBox = std::make_shared<HurtBox>();
     bool m_WasOnGround = false;
@@ -226,6 +298,7 @@ void p_StateMachine::Logic(float delta)
     {
         // do some Jump Stuff...
         // std::cout << JumpState.Name << "\n";
+        Parent->CheckForJumpReleased();
     }
     else if (State == RunState)
     {
@@ -241,18 +314,10 @@ void p_StateMachine::Logic(float delta)
     Parent->ApplyInputXToVelocity(delta);
 }
 
-void p_StateMachine::ExitState(int oldState, int newState)
-{
-    if (oldState == RunState)
-    {
-        Parent->m_SFX_Run.Stop();
-    }
-}
-
-
 int p_StateMachine::GetTransition(float delta)
 {
-    if (State == NullState) return IdleState.Id;
+    if (State == NullState)
+        return IdleState.Id;
 
     if (State == IdleState)
     {
@@ -278,7 +343,7 @@ int p_StateMachine::GetTransition(float delta)
     }
 
     if (Parent->p_ShouldJump() && PreviousState != JumpState)
-            return JumpState.Id;
+        return JumpState.Id;
     else if (State == JumpState)
     {
         if (Parent->p_ShouldFall())
@@ -293,6 +358,14 @@ int p_StateMachine::GetTransition(float delta)
     return State;
 }
 
+void p_StateMachine::ExitState(int oldState, int newState)
+{
+    if (oldState == RunState)
+    {
+        Parent->m_SFX_Run.Stop();
+    }
+}
+
 void p_StateMachine::EnterState(int newState, int oldState)
 {
     Parent->m_Animator.StopAll();
@@ -302,19 +375,20 @@ void p_StateMachine::EnterState(int newState, int oldState)
         Parent->m_SFX_Run.Play(DeltaSpeedModifier::GetSpeed() * 1.4f, 1.8f, true);
         Parent->m_Animator.Play(Parent->m_RunAnimation);
     }
-    
+
     if (newState == TurnState)
         Parent->m_Animator.Play(Parent->m_RunAnimation);
 
     if (newState == IdleState)
         Parent->m_Animator.Play(Parent->m_IdleAnimation);
-    
+
     if (newState == JumpState)
     {
         Parent->m_SFX_Jump.Play(DeltaSpeedModifier::GetSpeed());
         Parent->m_Animator.Play(Parent->m_JumpAnimation);
+        Parent->Jump();
     }
-    
+
     if (newState == FallState && oldState == JumpState)
         Parent->m_Animator.Play(Parent->m_FallAnimation);
 };
